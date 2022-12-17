@@ -15,3 +15,8 @@ path = "src/day1/calorie_counting.rs"
 [[bin]]
 name = "rock_paper_scissors"
 path = "src/day2/rock_paper_scissors.rs"
+
+
+[[bin]]
+name = "rucksack_reorganization"
+path = "src/day3/rucksack_reorganization.rs"
