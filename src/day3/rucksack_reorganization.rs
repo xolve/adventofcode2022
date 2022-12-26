@@ -1,12 +1,10 @@
 use anyhow::{anyhow, Error, Result};
 
-use std::collections::binary_heap::Iter;
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::hash::Hash;
 use std::io::{BufRead, BufReader};
-use std::iter::Take;
 
 #[derive(PartialEq, Eq, Hash)]
 struct Priority(u64);
@@ -29,26 +27,14 @@ impl TryFrom<char> for Priority {
     }
 }
 
-fn line_to_priorities(line: &str) -> Result<(Priorities, Priorities)> {
-    assert!(line.len() % 2 == 0);
-    let line_iter = line.chars();
-    let v0 = line_iter
-        .take(line.len() / 2)
-        .map(|c| Priority::try_from(c))
-        .collect::<Result<Priorities>>()?;
-    let line_iter = line.chars();
-    let v1 = line_iter
-        .skip(line.len() / 2)
-        .take(line.len() / 2)
-        .map(|c| Priority::try_from(c))
-        .collect::<Result<Priorities>>()?;
-    Ok((v0, v1))
+fn line_to_priorities(line: &str) -> Result<Priorities> {
+    line.chars().map(|c| Priority::try_from(c)).collect()
 }
 
-fn read_file(path: &str) -> Result<Vec<(Priorities, Priorities)>> {
+fn read_file(path: &str) -> Result<Vec<Priorities>> {
     let f = File::open(path)?;
-    let bufReader = BufReader::new(f);
-    bufReader
+    let buf_reader = BufReader::new(f);
+    buf_reader
         .lines()
         .map(|line_res| {
             line_res
@@ -58,9 +44,10 @@ fn read_file(path: &str) -> Result<Vec<(Priorities, Priorities)>> {
         .collect()
 }
 
-fn intersection_sum(p0s: &Priorities, p1s: &Priorities) -> u64 {
-    let p0_distinct = p0s.iter().collect::<HashSet<_>>();
-    let p1_distinct = p1s.iter().collect::<HashSet<_>>();
+fn part1(prios: &Priorities) -> u64 {
+    assert!(prios.len() % 2 == 0);
+    let p0_distinct = prios.iter().take(prios.len() / 2).collect::<HashSet<_>>();
+    let p1_distinct = prios.iter().skip(prios.len() / 2).collect::<HashSet<_>>();
     p0_distinct
         .intersection(&p1_distinct)
         .map(|p| p.0)
@@ -88,9 +75,11 @@ where
         let elem0 = self.iter.next();
 
         if elem0.is_some() {
-            let elem1 = self.iter.next();
-            let elem2 = self.iter.next();
-            let v = vec![elem0, elem1, elem2];
+            let mut v = vec![elem0];
+            for _ in 1..self.n {
+                let elem = self.iter.next();
+                v.push(elem);
+            }
             v.into_iter()
                 .filter(|e| e.is_some())
                 .collect::<Option<Self::Item>>()
@@ -100,24 +89,10 @@ where
     }
 }
 
-fn read_file2(path: &str) -> Result<Vec<Priorities>> {
-    let f = File::open(path).unwrap();
-    let buf_reader = BufReader::new(f);
-    buf_reader
-        .lines()
-        .map(|line_res| {
-            line_res.map_err(Error::from).and_then(|line| {
-                line.chars()
-                    .map(|c| Priority::try_from(c))
-                    .collect::<Result<Priorities>>()
-            })
-        })
-        .collect::<Result<Vec<_>>>()
-}
-
-fn three_lines_stuff(line_prios: &[Priorities]) -> u64 {
+fn part2(line_prios: &[Priorities]) -> u64 {
     let niter = NIterator::new(line_prios.iter(), 3);
     niter.map(|three_lines| {
+        assert!(three_lines.len() == 3);
         let h0 = three_lines[0].iter().collect::<HashSet<_>>();
         let h1 = three_lines[1].iter().collect::<HashSet<_>>();
         let h2 = three_lines[2].iter().collect::<HashSet<_>>();
@@ -134,14 +109,14 @@ fn three_lines_stuff(line_prios: &[Priorities]) -> u64 {
 
 fn main() {
     let vps = read_file("src/day3/input_day3.txt").expect("Error reading file.");
+    
     let part1 = vps
         .iter()
-        .map(|(p0, p1)| intersection_sum(p0, p1))
+        .map(|prios| part1(prios))
         .sum::<u64>();
     println!("{}", part1);
 
-    let vps = read_file2("src/day3/input_day3.txt").expect("Error reading file.");
-    let part2 = three_lines_stuff(&vps);
+    let part2 = part2(&vps);
     println!("{}", part2);
 }
 
@@ -153,41 +128,62 @@ mod tests {
     fn line_to_priorities_passes() {
         let answer = line_to_priorities("aBxY");
         assert!(answer.is_ok());
-        let (p0, p1) = answer.unwrap();
-        assert_eq!(p0.len(), 2);
-        assert_eq!(p1.len(), 2);
+        let p0 = answer.unwrap();
+        assert_eq!(p0.len(), 4);
         assert_eq!(p0[0].0, 1);
         assert_eq!(p0[1].0, 28);
-        assert_eq!(p1[0].0, 24);
-        assert_eq!(p1[1].0, 51);
+        assert_eq!(p0[2].0, 24);
+        assert_eq!(p0[3].0, 51);
     }
 
     #[test]
-    #[should_panic(expected = "assertion failed: line.len() % 2 == 0")]
-    fn line_to_priorities_fails_odd_length() {
-        let answer = line_to_priorities("aBxYz");
-        assert!(answer.is_err());
+    #[should_panic(expected = "assertion failed: prios.len() % 2 == 0")]
+    fn part1_fails_odd_length() {
+        let prios = vec![Priority(2), Priority(9), Priority(2), Priority(10), Priority(2), ];
+        let _ = part1(&prios);
     }
 
     #[test]
-    fn intersection_sum_passes() {
-        let p0s = vec![Priority(2), Priority(9), Priority(2), Priority(10)];
-        let p1s = vec![Priority(2), Priority(10), Priority(10), Priority(1)];
-        assert_eq!(intersection_sum(&p0s, &p1s), 12);
+    fn part1_sum_passes() {
+        let prios = vec![Priority(2), Priority(9), Priority(2), Priority(10), Priority(2), Priority(10), Priority(10), Priority(1), ];
+        assert_eq!(part1(&prios), 12);
     }
 
     #[test]
-    fn intersection_sum_passes_one_list_empty() {
-        let p0s = vec![Priority(2), Priority(9), Priority(2), Priority(10)];
-        let p1s = vec![];
-        assert_eq!(intersection_sum(&p0s, &p1s), 0);
-        assert_eq!(intersection_sum(&p1s, &p0s), 0);
+    fn part1_sum_passes_list_empty() {
+        let prios = vec![];
+        assert_eq!(part1(&prios), 0);
     }
 
     #[test]
-    fn intersection_sum_passes_both_lists_empty() {
-        let p0s = vec![];
-        let p1s = vec![];
-        assert_eq!(intersection_sum(&p0s, &p1s), 0);
+    fn niterator_should_group_with_remainder() {
+        let elems = vec![0, 1, 2, 3, 4, 5, 6, 7, ];
+        let niter = NIterator::new(elems.into_iter(), 3);
+        let nelems = niter.collect::<Vec<_>>();
+        assert_eq!(nelems[0], vec![0, 1, 2, ]);
+        assert_eq!(nelems[1], vec![3, 4, 5, ]);
+        assert_eq!(nelems[2], vec![6, 7, ]);
+    }
+
+    #[test]
+    fn part2_passes() {
+        let p0s = vec![Priority(2), Priority(9), Priority(2), Priority(10), Priority(2), Priority(10), Priority(10), Priority(1), ];
+        let p1s = vec![Priority(90), Priority(12), Priority(10), Priority(21), Priority(10), ];
+        let p2s = vec![Priority(12), Priority(10), Priority(15), Priority(9), ];
+
+        let answer = part2(&vec![p0s, p1s, p2s, ]);
+        assert_eq!(answer, 10)
+    }
+
+    #[test]
+    #[should_panic(expected = "three_lines.len() == 3")]
+    fn part2_fails_on_non_3_length() {
+        let p0s = vec![Priority(2), Priority(9), Priority(2), Priority(10), Priority(2), Priority(10), Priority(10), Priority(1), ];
+        let p1s = vec![Priority(90), Priority(12), Priority(10), Priority(21), Priority(10), ];
+        let p2s = vec![Priority(12), Priority(10), Priority(15), Priority(9), ];
+        let p3s = vec![Priority(16), Priority(15), Priority(90), ];
+
+        let answer = part2(&vec![p0s, p1s, p2s, p3s, ]);
+        assert_eq!(answer, 10)
     }
 }
