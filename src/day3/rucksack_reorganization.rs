@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Error, Result};
 
-use std::collections::HashSet;
+use std::collections::binary_heap::Iter;
+use std::collections::{HashSet, VecDeque};
 use std::convert::TryFrom;
 use std::fs::File;
+use std::hash::Hash;
 use std::io::{BufRead, BufReader};
+use std::iter::Take;
 
 #[derive(PartialEq, Eq, Hash)]
 struct Priority(u64);
@@ -64,6 +67,71 @@ fn intersection_sum(p0s: &Priorities, p1s: &Priorities) -> u64 {
         .sum::<u64>()
 }
 
+struct NIterator<I> {
+    iter: I,
+    n: usize,
+}
+
+impl<I> NIterator<I> {
+    fn new(iter: I, n: usize) -> Self {
+        NIterator { n, iter }
+    }
+}
+
+impl<I> Iterator for NIterator<I>
+where
+    I: Iterator,
+{
+    type Item = Vec<<I as Iterator>::Item>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let elem0 = self.iter.next();
+
+        if elem0.is_some() {
+            let elem1 = self.iter.next();
+            let elem2 = self.iter.next();
+            let v = vec![elem0, elem1, elem2];
+            v.into_iter()
+                .filter(|e| e.is_some())
+                .collect::<Option<Self::Item>>()
+        } else {
+            None
+        }
+    }
+}
+
+fn read_file2(path: &str) -> Result<Vec<Priorities>> {
+    let f = File::open(path).unwrap();
+    let buf_reader = BufReader::new(f);
+    buf_reader
+        .lines()
+        .map(|line_res| {
+            line_res.map_err(Error::from).and_then(|line| {
+                line.chars()
+                    .map(|c| Priority::try_from(c))
+                    .collect::<Result<Priorities>>()
+            })
+        })
+        .collect::<Result<Vec<_>>>()
+}
+
+fn three_lines_stuff(line_prios: &[Priorities]) -> u64 {
+    let niter = NIterator::new(line_prios.iter(), 3);
+    niter.map(|three_lines| {
+        let h0 = three_lines[0].iter().collect::<HashSet<_>>();
+        let h1 = three_lines[1].iter().collect::<HashSet<_>>();
+        let h2 = three_lines[2].iter().collect::<HashSet<_>>();
+
+        let intersections = h0.intersection(&h1)
+            .map(|p| *p)
+            .collect::<HashSet<&Priority>>()
+            .intersection(&h2)
+            .map(|&p| p.0)
+            .collect::<Vec<_>>();
+        intersections.iter().sum::<u64>()
+    }).sum::<u64>()
+}
+
 fn main() {
     let vps = read_file("src/day3/input_day3.txt").expect("Error reading file.");
     let part1 = vps
@@ -71,6 +139,10 @@ fn main() {
         .map(|(p0, p1)| intersection_sum(p0, p1))
         .sum::<u64>();
     println!("{}", part1);
+
+    let vps = read_file2("src/day3/input_day3.txt").expect("Error reading file.");
+    let part2 = three_lines_stuff(&vps);
+    println!("{}", part2);
 }
 
 #[cfg(test)]
