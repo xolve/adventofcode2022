@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
+regex = "1"
 
 [[bin]]
 name = "calorie_counting"
@@ -24,3 +25,7 @@ path = "src/day3/rucksack_reorganization.rs"
 [[bin]]
 name = "camp_cleanup"
 path = "src/day4/camp_cleanup.rs"
+
+[[bin]]
+name = "supply_stacks"
+path = "src/day5/supply_stacks.rs"
